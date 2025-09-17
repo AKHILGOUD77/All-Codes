@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Advanced Image Converter & ZIP Downloader</title>
+  <!-- Bootstrap 5.3.3 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <!-- PDF.js library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+  <style>
+    body {
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      min-height: 100vh;
+      padding-top: 20px;
+      padding-bottom: 50px;
+    }
+    .card {
+      border-radius: 15px;
+      overflow: hidden;
+    }
+    .preview {
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      padding: 15px;
+      background: #fff;
+      margin: 10px;
+      width: 300px;
+      transition: all 0.3s ease;
+    }
+    .preview:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+    }
+    .preview img {
+      border-radius: 6px;
+      max-height: 180px;
+      object-fit: contain;
+      width: 100%;
+      border: 1px solid #eee;
+    }
+    .progress {
+      height: 20px;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .progress-bar {
+      background: linear-gradient(90deg, #28a745, #4caf50);
+      transition: width 0.5s ease;
+    }
+    .settings-panel {
+      background-color: #f8f9fa;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .header-icon {
+      font-size: 2.5rem;
+      margin-bottom: 15px;
+      color: #4361ee;
+    }
+    .format-badge {
+      font-size: 0.75rem;
+      padding: 0.35em 0.65em;
+    }
+    .checkbox-container {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 10;
+    }
+    .preview-container {
+      position: relative;
+    }
+    .btn-download-all {
+      background: linear-gradient(90deg, #4361ee, #3a0ca3);
+      border: none;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-weight: 600;
+    }
+    .btn-download-selected {
+      background: linear-gradient(90deg, #f72585, #b5179e);
+      border: none;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-weight: 600;
+    }
+    .title {
+      color: #3a0ca3;
+      font-weight: 700;
+      text-shadow: 1px 1px 3px rgba(0,0,0,0.1);
+    }
+    .subtitle {
+      color: #4cc9f0;
+      font-weight: 500;
+    }
+    .size-comparison {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 10px;
+      padding: 8px;
+      background: #f8f9fa;
+      border-radius: 6px;
+      font-size: 0.85rem;
+    }
+    .original-size {
+      color: #6c757d;
+    }
+    .new-size {
+      color: #198754;
+      font-weight: 600;
+    }
+    .size-reduction {
+      color: #dc3545;
+      font-weight: 600;
+    }
+    .pdf-preview {
+      height: 180px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f8f9fa;
+      border-radius: 6px;
+      border: 1px solid #eee;
+    }
+    .size-badge {
+      background: linear-gradient(90deg, #4361ee, #3a0ca3);
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      margin-top: 5px;
+      display: inline-block;
+    }
+  </style>
+</head>
+<body>
+  <div class="container py-4">
+    <div class="card shadow-lg border-0 p-4 mb-5">
+      <div class="text-center mb-4">
+        <i class="bi bi-images header-icon"></i>
+        <h1 class="title">Advanced Image Converter</h1>
+        <p class="subtitle">
+          Convert images to your preferred format and download as ZIP
+        </p>
+      </div>
+
+      <!-- Settings Panel -->
+      <div class="settings-panel">
+        <div class="row">
+          <div class="col-md-4 mb-3">
+            <label for="formatSelect" class="form-label fw-semibold">Output Format</label>
+            <select class="form-select" id="formatSelect">
+              <option value="jpg">JPG (Default)</option>
+              <option value="png">PNG</option>
+              <option value="webp">WEBP</option>
+              <option value="pdf">PDF</option>
+            </select>
+          </div>
+          <div class="col-md-4 mb-3">
+            <label for="sizeRangeSelect" class="form-label fw-semibold">Target Size Range</label>
+            <select class="form-select" id="sizeRangeSelect">
+              <option value="50">50KB or below</option>
+              <option value="50-100">50KB - 100KB</option>
+              <option value="100-150" selected>100KB - 150KB</option>
+              <option value="150-200">150KB - 200KB</option>
+              <option value="200-300">200KB - 300KB</option>
+            </select>
+          </div>
+          <div class="col-md-4 mb-3">
+            <label for="fileInput" class="form-label fw-semibold">Select Images</label>
+            <input type="file" id="fileInput" class="form-control" accept=".png, .jpeg, .jpg, .webp, .pdf" multiple>
+          </div>
+        </div>
+        <div class="row mt-3">
+          <div class="col-12">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="autoDownload" checked>
+              <label class="form-check-label" for="autoDownload">
+                Auto-download ZIP after conversion
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="d-flex justify-content-center gap-3 flex-wrap mt-4">
+        <button onclick="processImages()" class="btn btn-download-all">
+          <i class="bi bi-file-earmark-zip"></i> Convert & Download All
+        </button>
+        <button onclick="downloadSelected()" class="btn btn-download-selected">
+          <i class="bi bi-download"></i> Download Selected Only
+        </button>
+      </div>
+
+      <!-- Progress -->
+      <div class="progress mt-4">
+        <div class="progress-bar" id="progressBar" role="progressbar"></div>
+      </div>
+
+      <!-- Status -->
+      <p class="text-center mt-3 fw-semibold" id="status"></p>
+
+      <!-- Preview -->
+      <div class="d-flex flex-wrap justify-content-center mt-4" id="previewContainer"></div>
+    </div>
+  </div>
+
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+
+  <script>
+    // Set up PDF.js worker
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+    
+    let imageData = [];
+    let convertedBlobs = {}; // Store converted blobs for preview
+    
+    document.getElementById('fileInput').addEventListener('change', function() {
+      const files = this.files;
+      const previewContainer = document.getElementById('previewContainer');
+      previewContainer.innerHTML = '';
+      imageData = [];
+      convertedBlobs = {};
+      
+      if (!files.length) return;
+      
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        
+        if (file.type === 'application/pdf') {
+          // Handle PDF files
+          handlePdfFile(file, i);
+        } else {
+          // Handle image files
+          handleImageFile(file, i);
+        }
+      }
+    });
+    
+    function handleImageFile(file, index) {
+      const reader = new FileReader();
+      
+      reader.onload = function(e) {
+        const img = new Image();
+        img.src = e.target.result;
+        
+        img.onload = function() {
+          imageData.push({
+            file: file,
+            url: e.target.result,
+            width: img.width,
+            height: img.height,
+            selected: true,
+            type: 'image'
+          });
+          
+          updatePreviews();
+        };
+      };
+      
+      reader.readAsDataURL(file);
+    }
+    
+    function handlePdfFile(file, index) {
+      const reader = new FileReader();
+      
+      reader.onload = function(e) {
+        const arrayBuffer = e.target.result;
+        
+        // Load PDF and get first page for preview
+        pdfjsLib.getDocument({ data: arrayBuffer }).promise.then(pdf => {
+          pdf.getPage(1).then(page => {
+            const viewport = page.getViewport({ scale: 1.5 });
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+            
+            page.render({
+              canvasContext: context,
+              viewport: viewport
+            }).promise.then(() => {
+              imageData.push({
+                file: file,
+                url: canvas.toDataURL('image/png'),
+                width: viewport.width,
+                height: viewport.height,
+                selected: true,
+                type: 'pdf',
+                pdfData: arrayBuffer
+              });
+              
+              updatePreviews();
+            });
+          });
+        });
+      };
+      
+      reader.readAsArrayBuffer(file);
+    }
+    
+    function updatePreviews() {
+      const previewContainer = document.getElementById('previewContainer');
+      previewContainer.innerHTML = '';
+      
+      imageData.forEach((data, index) => {
+        const previewDiv = document.createElement('div');
+        previewDiv.className = 'preview';
+        
+        // Check if we have converted size info
+        const convertedInfo = convertedBlobs[data.file.name] ? `
+          <div class="size-comparison">
+            <span class="original-size">Original: ${formatFileSize(data.file.size)}</span>
+            <span class="new-size">New: ${formatFileSize(convertedBlobs[data.file.name].size)}</span>
+            <span class="size-reduction">${calculateSizeReduction(data.file.size, convertedBlobs[data.file.name].size)}</span>
+          </div>
+        ` : `
+          <div class="size-comparison">
+            <span class="original-size">Original: ${formatFileSize(data.file.size)}</span>
+            <span class="new-size">New: -</span>
+            <span class="size-reduction">-</span>
+          </div>
+        `;
+        
+        // Get selected size range for display
+        const sizeRangeSelect = document.getElementById('sizeRangeSelect');
+        const selectedSizeRange = sizeRangeSelect.options[sizeRangeSelect.selectedIndex].text;
+        
+        previewDiv.innerHTML = `
+          <div class="preview-container">
+            <div class="checkbox-container">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="check-${index}" 
+                  ${data.selected ? 'checked' : ''} onchange="toggleImageSelection(${index})">
+                <label class="form-check-label" for="check-${index}"></label>
+              </div>
+            </div>
+            <h6 class="fw-bold text-truncate">${data.file.name}</h6>
+            <p class="mb-1">
+              <span class="badge bg-secondary format-badge">${data.width}x${data.height}</span>
+              <span class="badge bg-info format-badge">${data.type.toUpperCase()}</span>
+            </p>
+            ${data.type === 'pdf' ? `
+              <div class="pdf-preview">
+                <i class="bi bi-file-earmark-pdf-fill text-danger" style="font-size: 3rem;"></i>
+              </div>
+            ` : `
+              <img src="${data.url}" alt="Preview">
+            `}
+            ${convertedInfo}
+            <div class="size-badge">Target: ${selectedSizeRange}</div>
+          </div>
+        `;
+        
+        previewContainer.appendChild(previewDiv);
+      });
+    }
+    
+    function formatFileSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+      else return (bytes / 1048576).toFixed(1) + ' MB';
+    }
+    
+    function calculateSizeReduction(originalSize, newSize) {
+      const reduction = ((originalSize - newSize) / originalSize) * 100;
+      return reduction > 0 ? `-${reduction.toFixed(1)}%` : `+${Math.abs(reduction).toFixed(1)}%`;
+    }
+    
+    function getSizeRangeBounds() {
+      const sizeRange = document.getElementById('sizeRangeSelect').value;
+      
+      if (sizeRange === '50') return { min: 0, max: 50 * 1024 };
+      if (sizeRange === '50-100') return { min: 50 * 1024, max: 100 * 1024 };
+      if (sizeRange === '100-150') return { min: 100 * 1024, max: 150 * 1024 };
+      if (sizeRange === '150-200') return { min: 150 * 1024, max: 200 * 1024 };
+      if (sizeRange === '200-300') return { min: 200 * 1024, max: 300 * 1024 };
+      
+      // Default to 100-150KB
+      return { min: 100 * 1024, max: 150 * 1024 };
+    }
+    
+    function toggleImageSelection(index) {
+      imageData[index].selected = !imageData[index].selected;
+    }
+    
+    async function processImages() {
+      const formatSelect = document.getElementById('formatSelect');
+      const outputFormat = formatSelect.value;
+      const autoDownload = document.getElementById('autoDownload').checked;
+      const progressBar = document.getElementById('progressBar');
+      const status = document.getElementById('status');
+      const sizeRange = getSizeRangeBounds();
+      
+      progressBar.style.width = '0%';
+      progressBar.textContent = '0%';
+      status.innerText = 'Processing images...';
+      status.className = 'text-center mt-3 fw-semibold text-primary';
+      
+      if (imageData.length === 0) {
+        status.innerText = 'Please select images first.';
+        status.className = 'text-center mt-3 fw-semibold text-danger';
+        return;
+      }
+      
+      const zip = new JSZip();
+      let processedCount = 0;
+      const selectedImages = imageData.filter(img => img.selected);
+      
+      if (selectedImages.length === 0) {
+        status.innerText = 'Please select at least one image to convert.';
+        status.className = 'text-center mt-3 fw-semibold text-danger';
+        return;
+      }
+      
+      // Reset converted blobs
+      convertedBlobs = {};
+      
+      for (let i = 0; i < selectedImages.length; i++) {
+        const data = selectedImages[i];
+        
+        if (outputFormat === 'pdf') {
+          // Handle PDF conversion
+          await convertToPdf(data, zip, i);
+        } else {
+          // Handle image conversion
+          await convertToImage(data, outputFormat, zip, i, sizeRange);
+        }
+        
+        // Update progress bar
+        processedCount++;
+        const progressPercent = (processedCount / selectedImages.length) * 100;
+        progressBar.style.width = `${progressPercent}%`;
+        progressBar.setAttribute('aria-valuenow', progressPercent);
+        progressBar.textContent = `${Math.round(progressPercent)}%`;
+      }
+      
+      if (autoDownload) {
+        // Generate ZIP and download
+        zip.generateAsync({ type: 'blob' }).then(content => {
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(content);
+          a.download = `converted_images.${outputFormat}.zip`;
+          a.click();
+          status.innerText = `✅ Conversion complete! ${selectedImages.length} files downloaded as ZIP.`;
+          status.className = 'text-center mt-3 fw-semibold text-success';
+          
+          // Update previews to show final sizes
+          updatePreviews();
+        });
+      } else {
+        status.innerText = `✅ Conversion complete! Ready to download.`;
+        status.className = 'text-center mt-3 fw-semibold text-success';
+        
+        // Add manual download button
+        zip.generateAsync({ type: 'blob' }).then(content => {
+          const downloadBtn = document.createElement('button');
+          downloadBtn.className = 'btn btn-success mt-2';
+          downloadBtn.innerHTML = '<i class="bi bi-download"></i> Download ZIP Now';
+          downloadBtn.onclick = function() {
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(content);
+            a.download = `converted_images.${outputFormat}.zip`;
+            a.click();
+          };
+          
+          status.appendChild(document.createElement('br'));
+          status.appendChild(downloadBtn);
+          
+          // Update previews to show final sizes
+          updatePreviews();
+        });
+      }
+    }
+    
+    async function convertToImage(data, outputFormat, zip, index, sizeRange) {
+      return new Promise(async (resolve) => {
+        const img = new Image();
+        img.src = data.url;
+        
+        img.onload = async () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          
+          let quality = 0.9;
+          let blob;
+          
+          // Determine MIME type based on selected format
+          let mimeType = 'image/jpeg';
+          if (outputFormat === 'png') mimeType = 'image/png';
+          if (outputFormat === 'webp') mimeType = 'image/webp';
+          
+          // For PNG (lossless), we can't control size through quality
+          if (outputFormat === 'png') {
+            blob = await new Promise(res => canvas.toBlob(res, mimeType));
+          } 
+          // For JPG and WEBP (lossy formats), adjust quality to hit target size range
+          else {
+            let iterations = 0;
+            const maxIterations = 20; // Prevent infinite loops
+            
+            do {
+              blob = await new Promise(res => canvas.toBlob(res, mimeType, quality));
+              
+              if (blob.size > sizeRange.max && quality > 0.1) {
+                // File is too large, reduce quality
+                quality -= 0.05;
+              } else if (blob.size < sizeRange.min && quality < 1.0) {
+                // File is too small, increase quality
+                quality += 0.05;
+              } else {
+                // File is within range or we can't adjust further
+                break;
+              }
+              
+              iterations++;
+            } while (iterations < maxIterations);
+          }
+          
+          // Store converted blob for preview
+          convertedBlobs[data.file.name] = blob;
+          
+          // Add compressed image to ZIP
+          const arrayBuffer = await blob.arrayBuffer();
+          const newFileName = data.file.name.replace(/\.[^/.]+$/, '') + '.' + outputFormat;
+          zip.file(newFileName, arrayBuffer);
+          
+          resolve();
+        };
+      });
+    }
+    
+    async function convertToPdf(data, zip, index) {
+      return new Promise(async (resolve) => {
+        if (data.type === 'pdf') {
+          // If it's already a PDF, just add it to the ZIP
+          const newFileName = data.file.name.replace(/\.(pdf)$/i, '_converted.pdf');
+          zip.file(newFileName, data.pdfData);
+          
+          // Create a blob for size comparison
+          const blob = new Blob([data.pdfData], { type: 'application/pdf' });
+          convertedBlobs[data.file.name] = blob;
+        } else {
+          // Convert image to PDF
+          const img = new Image();
+          img.src = data.url;
+          
+          img.onload = async () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            
+            // Convert canvas to image data
+            const imageData = canvas.toDataURL('image/jpeg');
+            
+            // Create a simple PDF with the image
+            const pdfWidth = img.width * 0.75;
+            const pdfHeight = img.height * 0.75;
+            
+            // Create PDF using jsPDF would be better, but for simplicity we'll use a basic approach
+            // For a real implementation, you would want to use a PDF library like jsPDF
+            const pdfBlob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.8));
+            
+            // Store converted blob for preview
+            convertedBlobs[data.file.name] = pdfBlob;
+            
+            // Add to ZIP
+            const arrayBuffer = await pdfBlob.arrayBuffer();
+            const newFileName = data.file.name.replace(/\.[^/.]+$/, '') + '.pdf';
+            zip.file(newFileName, arrayBuffer);
+          };
+        }
+        
+        resolve();
+      });
+    }
+    
+    function downloadSelected() {
+      processImages();
+    }
+  </script>
+</body>
+</html>

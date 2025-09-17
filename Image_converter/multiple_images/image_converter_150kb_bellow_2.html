@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Image Converter & Downloader</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #0d6efd, #6f42c1);
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .card {
+      border-radius: 1rem;
+      box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+    }
+    .btn-custom {
+      border: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-md-8">
+        <div class="card p-4 text-center bg-light text-dark">
+          <h3 class="mb-3">
+            <i class="bi bi-image-fill text-primary"></i> Image Converter & Downloader
+          </h3>
+          <p class="text-muted">Convert and download images in different formats</p>
+
+          <input type="file" id="fileInput" class="form-control mb-3" accept=".png, .jpeg, .jpg" multiple>
+
+          <!-- ZIP option -->
+          <div class="form-check text-start mb-2">
+            <input class="form-check-input" type="checkbox" id="zipOption">
+            <label class="form-check-label" for="zipOption">
+              <i class="bi bi-archive"></i> Download in ZIP format
+            </label>
+          </div>
+
+          <!-- Serial naming -->
+          <div class="form-check text-start mb-2">
+            <input class="form-check-input" type="checkbox" id="serialOption" onchange="toggleSerialInput()">
+            <label class="form-check-label" for="serialOption">
+              <i class="bi bi-list-ol"></i> Use serial naming
+            </label>
+          </div>
+          <input type="text" id="serialBase" class="form-control mb-3 d-none" placeholder="Enter base name (e.g., holiday)">
+
+          <div class="d-grid gap-2">
+            <button class="btn btn-success btn-custom" onclick="processImages('jpg')">
+              <i class="bi bi-file-earmark-image"></i> Download as JPG
+            </button>
+            <button class="btn btn-primary btn-custom" onclick="processImages('png')">
+              <i class="bi bi-filetype-png"></i> Download as PNG
+            </button>
+            <button class="btn btn-info text-white btn-custom" onclick="processImages('jpeg')">
+              <i class="bi bi-filetype-jpg"></i> Download as JPEG
+            </button>
+            <button class="btn btn-danger btn-custom" onclick="downloadPDF()">
+              <i class="bi bi-filetype-pdf"></i> Download as PDF
+            </button>
+          </div>
+
+          <div id="status" class="fw-bold mt-3"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function toggleSerialInput() {
+      const serial = document.getElementById("serialOption").checked;
+      document.getElementById("serialBase").classList.toggle("d-none", !serial);
+    }
+
+    function getFileName(file, format, index) {
+      const serial = document.getElementById("serialOption").checked;
+      const baseName = document.getElementById("serialBase").value.trim();
+
+      if (serial && baseName) {
+        return `${baseName}${index + 1}.${format}`;
+      } else {
+        return file.name.replace(/\.(png|jpeg|jpg)$/i, `.${format}`);
+      }
+    }
+
+    async function processImages(format) {
+      const files = document.getElementById('fileInput').files;
+      const status = document.getElementById('status');
+      const useZip = document.getElementById('zipOption').checked;
+
+      if (!files.length) {
+        status.innerHTML = "<span class='text-danger'><i class='bi bi-exclamation-circle'></i> Please select images first.</span>";
+        return;
+      }
+
+      status.innerHTML = `<i class='bi bi-hourglass-split text-warning'></i> Processing to ${format.toUpperCase()}...`;
+
+      const zip = new JSZip();
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const img = new Image();
+        img.src = URL.createObjectURL(file);
+
+        await new Promise(resolve => {
+          img.onload = async () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+
+            let blob;
+            if (format === "jpg" || format === "jpeg") {
+              let quality = 0.9;
+              do {
+                blob = await new Promise(res => canvas.toBlob(res, "image/jpeg", quality));
+                quality -= 0.05;
+              } while (blob.size > 150 * 1024 && quality > 0.1);
+            } else {
+              blob = await new Promise(res => canvas.toBlob(res, "image/png"));
+            }
+
+            const newName = getFileName(file, format, i);
+
+            if (useZip) {
+              const arrayBuffer = await blob.arrayBuffer();
+              zip.file(newName, arrayBuffer);
+            } else {
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = newName;
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+              URL.revokeObjectURL(url);
+            }
+
+            resolve();
+          };
+        });
+      }
+
+      if (useZip) {
+        zip.generateAsync({ type: 'blob' }).then(content => {
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(content);
+          a.download = `converted_images_${format}.zip`;
+          a.click();
+        });
+        status.innerHTML = `<i class='bi bi-check-circle-fill text-success'></i> ZIP (${format.toUpperCase()}) downloaded.`;
+      } else {
+        status.innerHTML = `<i class='bi bi-check-circle-fill text-success'></i> All images downloaded as ${format.toUpperCase()}.`;
+      }
+    }
+
+    async function downloadPDF() {
+      const files = document.getElementById('fileInput').files;
+      const status = document.getElementById('status');
+
+      if (!files.length) {
+        status.innerHTML = "<span class='text-danger'><i class='bi bi-exclamation-circle'></i> Please select images first.</span>";
+        return;
+      }
+
+      status.innerHTML = "<i class='bi bi-hourglass-split text-warning'></i> Creating PDF...";
+
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF();
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const img = new Image();
+        img.src = URL.createObjectURL(file);
+
+        await new Promise(resolve => {
+          img.onload = () => {
+            const canvas = document.createElement("canvas");
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0);
+
+            const imgData = canvas.toDataURL("image/jpeg", 0.9);
+
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = (img.height * pdfWidth) / img.width;
+
+            if (i > 0) pdf.addPage();
+            pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
+            resolve();
+          };
+        });
+      }
+
+      pdf.save("converted_images.pdf");
+      status.innerHTML = "<i class='bi bi-check-circle-fill text-success'></i> PDF downloaded.";
+    }
+  </script>
+</body>
+</html>
